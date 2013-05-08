@@ -54,10 +54,10 @@ int InitGL(int winWidth, int winHeight, int glver_major, int glver_minor){
 
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LESS);
-	glDepthMask(GL_TRUE);
 	glDepthRange(0.0f, 1.0f);
 
-	glClearColor(0.1, 0.0, 0.35, 1.0f);
+	//glClearColor(0.1, 0.0, 0.35, 1.0f);
+	glClearColor(1,0,0,1);
 	glClearDepth(1.0f);
 
 	gSceneParams.winWidth = winWidth;
@@ -91,16 +91,13 @@ int InitScene(){
 	glGenTextures(1, &gSceneParams.LinearDepthTexture);
 	glBindTexture(GL_TEXTURE_2D, gSceneParams.LinearDepthTexture);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, gSceneParams.winWidth, gSceneParams.winHeight, 0, GL_RED, GL_FLOAT, 0);
-	//glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, gSceneParams.winWidth, gSceneParams.winHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, gSceneParams.LinearDepthTexture, 0);
-	//glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, gSceneParams.LinearDepthTexture, 0);
 
 	GLenum drawBuffes[1] = { GL_COLOR_ATTACHMENT0 };
 	glDrawBuffers(1, drawBuffes);
-	//glDrawBuffer(GL_NONE);
 
 	// Проверка на ошибки.
 	GLenum er = glGetError();
@@ -196,6 +193,9 @@ void RenderScene(){
 	glDisableVertexAttribArray(1);
 	glUseProgram( 0 );
 	*/
+
+	// Рендерим текструы глубины и нормалей.
+	glClearColor(1,0,0,1);
 	glBindFramebuffer(GL_FRAMEBUFFER, gSceneParams.DepthNormalFrameBuffer);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glUseProgram( gSceneParams.DepNorShader );
@@ -214,6 +214,7 @@ void RenderScene(){
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex_Pos_Col), (void*)(sizeof(GLfloat)*3));
 	glDrawElements(GL_TRIANGLES, gSceneParams.testIndCount, GL_UNSIGNED_SHORT, 0);
 
+	glClearColor(0.1, 0.0, 0.35, 1.0f);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glUseProgram(quadShader);
@@ -228,6 +229,7 @@ void RenderScene(){
 
 	/*
 	// Тестовый объект.
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glUseProgram( gSceneParams.gridShader );
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
