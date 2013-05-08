@@ -196,7 +196,6 @@ void RenderScene(){
 	glDisableVertexAttribArray(1);
 	glUseProgram( 0 );
 	*/
-
 	glBindFramebuffer(GL_FRAMEBUFFER, gSceneParams.DepthNormalFrameBuffer);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glUseProgram( gSceneParams.DepNorShader );
