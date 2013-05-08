@@ -87,7 +87,7 @@ int InitScene(){
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, gSceneParams.DepthRenderBuffer);
 	glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
-	// Создаём текстуры линейной глубины и нормалей.
+	// Создаём текстуры для рендеринга линейной глубины и нормалей.
 	glGenTextures(1, &gSceneParams.LinearDepthTexture);
 	glBindTexture(GL_TEXTURE_2D, gSceneParams.LinearDepthTexture);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, gSceneParams.winWidth, gSceneParams.winHeight, 0, GL_RED, GL_FLOAT, 0);
@@ -96,8 +96,16 @@ int InitScene(){
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, gSceneParams.LinearDepthTexture, 0);
 
-	GLenum drawBuffes[1] = { GL_COLOR_ATTACHMENT0 };
-	glDrawBuffers(1, drawBuffes);
+	glGenTextures(1, &gSceneParams.NormalTexture);
+	glBindTexture(GL_TEXTURE_2D, gSceneParams.NormalTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, gSceneParams.winWidth, gSceneParams.winHeight, 0, GL_RGB, GL_FLOAT, 0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, gSceneParams.NormalTexture, 0);
+
+	GLenum drawBuffes[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+	glDrawBuffers(2, drawBuffes);
 
 	// Проверка на ошибки.
 	GLenum er = glGetError();
@@ -220,6 +228,7 @@ void RenderScene(){
 	glUseProgram(quadShader);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, gSceneParams.LinearDepthTexture);
+	//glBindTexture(GL_TEXTURE_2D, gSceneParams.NormalTexture);
 	glUniform1i(renderedTextureID, 0);
 	glBindBuffer(GL_ARRAY_BUFFER, quadVerBuffer);
 	glEnableVertexAttribArray(0);
@@ -253,7 +262,7 @@ static void AmbientOcclusion(){
 	// Загружаем объект.
 	vector<Vertex_Pos_Col> vers;
 	vector<GLushort> inds;
-	FILE* f = fopen("many.obj", "r");
+	FILE* f = fopen("monkey.obj", "r");
 	if( f == NULL ){
 		cerr << "Could not open file." << endl;
 		return;

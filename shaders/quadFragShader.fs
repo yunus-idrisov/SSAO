@@ -10,4 +10,5 @@ uniform float time;
 void main(){
 	float d = texture(renderedTexture, uv).r;
 	color = vec3(d,d,d);
+	/*color = texture(renderedTexture, uv).xyz;*/
 }
