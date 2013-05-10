@@ -32,11 +32,20 @@ struct SceneParameters{
 	// Текстуры линейной глубины и нормалей сцены.
 	GLuint		LinearDepthTexture;
 	GLuint		NormalTexture;
+
 	GLuint		DepNorShader;
 	GLuint		DepNorShader_P_Ref;
 	GLuint		DepNorShader_V_Ref;
 	GLuint		DepNorShader_W_Ref;
 
+	GLuint		SSAO_Shader;
+	GLuint		SSAO_Shader_LinDepthMap_Ref;
+	GLuint		SSAO_Shader_NormalMap_Ref;
+	GLuint		SSAO_Shader_RandVectorsMap4x4_Ref;
+	GLuint		SSAO_Shader_P_Ref;
+	GLuint		SSAO_Shader_winRatio_Ref;
+
+	GLuint		RandVectorsTexture4x4;
 	Camera		cam;
 };
 
