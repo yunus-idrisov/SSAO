@@ -172,27 +172,30 @@ int InitScene(){
 	}
 	gSceneParams.SSAO_Shader_LinDepthMap_Ref = glGetUniformLocation(gSceneParams.SSAO_Shader, "LinDepthMap");
 	gSceneParams.SSAO_Shader_NormalMap_Ref = glGetUniformLocation(gSceneParams.SSAO_Shader, "NormalMap");
-	gSceneParams.SSAO_Shader_RandVectorsMap4x4_Ref = glGetUniformLocation(gSceneParams.SSAO_Shader, "RandVectorsMap4x4");
+	gSceneParams.SSAO_Shader_SamplesMap_Ref = glGetUniformLocation(gSceneParams.SSAO_Shader, "SamplesMap");
+	gSceneParams.SSAO_Shader_RandVectorsMap_Ref = glGetUniformLocation(gSceneParams.SSAO_Shader, "RandVectorsMap");
 	gSceneParams.SSAO_Shader_P_Ref = glGetUniformLocation(gSceneParams.SSAO_Shader, "P");
 	gSceneParams.SSAO_Shader_winRatio_Ref = glGetUniformLocation(gSceneParams.SSAO_Shader, "winRatio");
 
 	// Генерация случайных векторов длины 1
 	// для определения occlusion factor'а.
-	GLuint testImgWidth = 16, testImgHeight = 16;
-	GLubyte testImgPixels[testImgHeight][testImgWidth][3];
+	GLuint testImgSize = 16;
+	GLubyte testImgPixels[testImgSize][testImgSize][3];
 	srand(time(0));
 	int k = 0;
-	for(int i = 0; i < testImgHeight; i++){
-		for(int j = 0; j < testImgWidth; j++){
+	for(int i = 0; i < testImgSize; i++){
+		for(int j = 0; j < testImgSize; j++){
 			Vector3f rv;
 			rv.x = GetRand();
 			rv.y = GetRand();
-			rv.z = GetRand();
+			rv.z = (GetRand() + 1.0f)/2.0f;
 			Vec3Normalize(rv);
-			//rv.x *= (GetRand() + 1.0f)/2.0f;
-			//rv.y *= (GetRand() + 1.0f)/2.0f;
-			//rv.z *= (GetRand() + 1.0f)/2.0f;
-			float scale = float(k)/(testImgWidth*testImgHeight);
+			//float r = 0.5f*GetRand() + 0.5f;
+			float r = 0.45f*GetRand() + 0.55f;
+			rv.x *= r;
+			rv.y *= r;
+			rv.z *= r;
+			float scale = float(k)/(testImgSize*testImgSize);
 			scale = 0.1f + (1.0f - 0.1f)*scale*scale;
 			rv.x *= scale;
 			rv.y *= scale;
@@ -201,14 +204,41 @@ int InitScene(){
 			testImgPixels[i][j][1] = (rv.y + 1.0f)/2.0f*255;
 			testImgPixels[i][j][2] = (rv.z + 1.0f)/2.0f*255;
 			k++;
-			if( i == 0 && j == 15 )
+			//if( i == 15 && j == 15 )
+				//cout << rv.x << " " << rv.y << " " << rv.z << endl;
+		}
+	}
+
+	glGenTextures(1, &gSceneParams.SamplesTexture);
+	glBindTexture(GL_TEXTURE_2D, gSceneParams.SamplesTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, testImgSize, testImgSize, 0, GL_RGB, GL_UNSIGNED_BYTE, testImgPixels);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	testImgSize = 4;
+	GLubyte RandVectors[testImgSize][testImgSize][3];
+	srand(time(0));
+	for(int i = 0; i < testImgSize; i++){
+		for(int j = 0; j < testImgSize; j++){
+			Vector3f rv;
+			rv.x = GetRand();
+			rv.y = GetRand();
+			rv.z = GetRand();
+			Vec3Normalize(rv);
+			RandVectors[i][j][0] = (rv.x + 1.0f)/2.0f*255;
+			RandVectors[i][j][1] = (rv.y + 1.0f)/2.0f*255;
+			RandVectors[i][j][2] = (rv.z + 1.0f)/2.0f*255;
+			if( i == 15 && j == 15 )
 				cout << rv.x << " " << rv.y << " " << rv.z << endl;
 		}
 	}
 
-	glGenTextures(1, &gSceneParams.RandVectorsTexture4x4);
-	glBindTexture(GL_TEXTURE_2D, gSceneParams.RandVectorsTexture4x4);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, testImgWidth, testImgHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, testImgPixels);
+	glGenTextures(1, &gSceneParams.RandVectorsTexture);
+	glBindTexture(GL_TEXTURE_2D, gSceneParams.RandVectorsTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, testImgSize, testImgSize, 0, GL_RGB, GL_UNSIGNED_BYTE, RandVectors);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -285,7 +315,7 @@ void RenderScene(){
 	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	//glUseProgram(quadShader);
 	//glActiveTexture(GL_TEXTURE0);
-	//glBindTexture(GL_TEXTURE_2D, gSceneParams.RandVectorsTexture4x4);
+	//glBindTexture(GL_TEXTURE_2D, gSceneParams.SamplesTexture);
 	//glBindTexture(GL_TEXTURE_2D, gSceneParams.LinearDepthTexture);
 	//glBindTexture(GL_TEXTURE_2D, gSceneParams.NormalTexture);
 	//glUniform1i(renderedTextureID, 0);
@@ -306,8 +336,11 @@ void RenderScene(){
 	glBindTexture(GL_TEXTURE_2D, gSceneParams.NormalTexture);
 	glUniform1i(gSceneParams.SSAO_Shader_NormalMap_Ref, 1);
 	glActiveTexture(GL_TEXTURE2);
-	glBindTexture(GL_TEXTURE_2D, gSceneParams.RandVectorsTexture4x4);
-	glUniform1i(gSceneParams.SSAO_Shader_RandVectorsMap4x4_Ref, 2);
+	glBindTexture(GL_TEXTURE_2D, gSceneParams.SamplesTexture);
+	glUniform1i(gSceneParams.SSAO_Shader_SamplesMap_Ref, 2);
+	glActiveTexture(GL_TEXTURE3);
+	glBindTexture(GL_TEXTURE_2D, gSceneParams.RandVectorsTexture);
+	glUniform1i(gSceneParams.SSAO_Shader_RandVectorsMap_Ref, 3);
 	glUniformMatrix4fv( gSceneParams.SSAO_Shader_P_Ref, 1, GL_TRUE, P.m );
 	glUniform1f( gSceneParams.SSAO_Shader_winRatio_Ref, gSceneParams.cam.GetRatio() );
 	glBindBuffer(GL_ARRAY_BUFFER, quadVerBuffer);

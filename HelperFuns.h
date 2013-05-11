@@ -41,11 +41,13 @@ struct SceneParameters{
 	GLuint		SSAO_Shader;
 	GLuint		SSAO_Shader_LinDepthMap_Ref;
 	GLuint		SSAO_Shader_NormalMap_Ref;
-	GLuint		SSAO_Shader_RandVectorsMap4x4_Ref;
+	GLuint		SSAO_Shader_SamplesMap_Ref;
+	GLuint		SSAO_Shader_RandVectorsMap_Ref;
 	GLuint		SSAO_Shader_P_Ref;
 	GLuint		SSAO_Shader_winRatio_Ref;
 
-	GLuint		RandVectorsTexture4x4;
+	GLuint		SamplesTexture;
+	GLuint		RandVectorsTexture;
 	Camera		cam;
 };
 
