@@ -102,8 +102,8 @@ int InitScene(){
 
 	glGenTextures(1, &gSceneParams.NormalTexture);
 	glBindTexture(GL_TEXTURE_2D, gSceneParams.NormalTexture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, gSceneParams.winWidth, gSceneParams.winHeight, 0, GL_RGB, GL_FLOAT, 0);
-	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, gSceneParams.winWidth, gSceneParams.winHeight, 0, GL_RGB, GL_BYTE, 0);
+	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, gSceneParams.winWidth, gSceneParams.winHeight, 0, GL_RGB, GL_FLOAT, 0);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, gSceneParams.winWidth, gSceneParams.winHeight, 0, GL_RGB, GL_BYTE, 0);
 	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, gSceneParams.winWidth, gSceneParams.winHeight, 0, GL_RGB, GL_SHORT, 0);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -181,6 +181,7 @@ int InitScene(){
 	GLuint testImgWidth = 16, testImgHeight = 16;
 	GLubyte testImgPixels[testImgHeight][testImgWidth][3];
 	srand(time(0));
+	int k = 0;
 	for(int i = 0; i < testImgHeight; i++){
 		for(int j = 0; j < testImgWidth; j++){
 			Vector3f rv;
@@ -188,15 +189,19 @@ int InitScene(){
 			rv.y = GetRand();
 			rv.z = GetRand();
 			Vec3Normalize(rv);
-			GLdouble rand01 = drand48();
-			//cout << rand01 << endl;
-			rv.x *= (GetRand() + 1.0f)/2.0f;
-			rv.y *= (GetRand() + 1.0f)/2.0f;
-			rv.z *= (GetRand() + 1.0f)/2.0f;
+			//rv.x *= (GetRand() + 1.0f)/2.0f;
+			//rv.y *= (GetRand() + 1.0f)/2.0f;
+			//rv.z *= (GetRand() + 1.0f)/2.0f;
+			float scale = float(k)/(testImgWidth*testImgHeight);
+			scale = 0.1f + (1.0f - 0.1f)*scale*scale;
+			rv.x *= scale;
+			rv.y *= scale;
+			rv.z *= scale;
 			testImgPixels[i][j][0] = (rv.x + 1.0f)/2.0f*255;
 			testImgPixels[i][j][1] = (rv.y + 1.0f)/2.0f*255;
 			testImgPixels[i][j][2] = (rv.z + 1.0f)/2.0f*255;
-			if( i == 3 && j == 3 )
+			k++;
+			if( i == 0 && j == 15 )
 				cout << rv.x << " " << rv.y << " " << rv.z << endl;
 		}
 	}
@@ -206,8 +211,8 @@ int InitScene(){
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, testImgWidth, testImgHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, testImgPixels);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	AddGridToScene(1.0f, 10);
@@ -270,6 +275,10 @@ void RenderScene(){
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex_Pos_Col), (void*)0);
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex_Pos_Col), (void*)(sizeof(GLfloat)*3));
 	glDrawElements(GL_TRIANGLES, gSceneParams.testIndCount, GL_UNSIGNED_SHORT, 0);
+	glDisableVertexAttribArray(0);
+	glDisableVertexAttribArray(1);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
 	//glClearColor(0.1, 0.0, 0.35, 1.0f);
 	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -346,7 +355,7 @@ static void AmbientOcclusion(){
 	// Загружаем объект.
 	vector<Vertex_Pos_Col> vers;
 	vector<GLushort> inds;
-	FILE* f = fopen("many.obj", "r");
+	FILE* f = fopen("rand.obj", "r");
 	if( f == NULL ){
 		cerr << "Could not open file." << endl;
 		return;

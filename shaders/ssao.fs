@@ -14,12 +14,11 @@ out vec3 FragColor;
 
 void main(){
 	int w = 16;
-	/*PosVS = vec3(uv.x, uv.y, 0.2f);*/
 	vec3 viewRay = vec3( -(uv.x*2.0f - 1.0f)*winRatio, uv.y*2.0f - 1.0f, P[1][1] );
-	float d = texture(LinDepthMap, uv).r;
-	d = 0.1f + d*(100.0f - 0.1f);
 	viewRay = normalize(viewRay);
-	vec3 orig = vec3( viewRay.x*d/viewRay.z, viewRay.y*d/viewRay.z, d );
+	float d = mix(0.1f, 100.0f, texture(LinDepthMap, uv).r);
+	float t = d/viewRay.z;
+	vec3 orig = vec3( viewRay.x*t, viewRay.y*t, d );
 
 	float i = 1.0f/(w*2);
 	float j = i;
@@ -31,9 +30,12 @@ void main(){
 			rvec = orig + rvec;
 			vec4 projPoint = P*vec4(rvec,1.0f);
 			projPoint.xy /= projPoint.w;
+			if( projPoint.x > 1.0f || projPoint.x < -1.0f )
+				continue;
+			if( projPoint.y > 1.0f || projPoint.y < -1.0f )
+				continue;
 			projPoint.xy = projPoint.xy*0.5f + 0.5f;
-			float projPointDepth = texture(LinDepthMap, projPoint.xy).r;
-			projPointDepth = 0.1f + projPointDepth*(100.0f - 0.1f);
+			float projPointDepth = mix(0.1f, 100.0f, texture(LinDepthMap, projPoint.xy).r);
 			if( rvec.z > projPointDepth )
 				SuccedPoint++;
 		}
