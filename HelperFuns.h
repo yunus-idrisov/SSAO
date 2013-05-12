@@ -32,6 +32,8 @@ struct SceneParameters{
 	// Текстуры линейной глубины и нормалей сцены.
 	GLuint		LinearDepthTexture;
 	GLuint		NormalTexture;
+	// Текстура ambient occlusion.
+	GLuint		AmbientOcclusionTexture;
 
 	GLuint		DepNorShader;
 	GLuint		DepNorShader_P_Ref;
@@ -45,6 +47,9 @@ struct SceneParameters{
 	GLuint		SSAO_Shader_RandVectorsMap_Ref;
 	GLuint		SSAO_Shader_P_Ref;
 	GLuint		SSAO_Shader_winRatio_Ref;
+
+	GLuint		SSAO_Blur_Shader;
+	GLuint		SSAO_Blur_Shader_AmbOcclusionMap_Ref;
 
 	GLuint		SamplesTexture;
 	GLuint		RandVectorsTexture;

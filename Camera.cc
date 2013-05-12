@@ -8,17 +8,13 @@ Camera::Camera(){
 	near = 0.1f;
 	far = 100.0f;
 
-	//eye.x = eye.y = eye.z = 10.0f;
-	eye.x = 4; eye.y = eye.z = 0.0f;
+	eye.x = eye.y = eye.z = 10.0f;
 	target.x = target.y = target.z = 0.0f;
 	up.x = up.z = 0.0f; up.y = 1.0f;
 
-	//alpha = gSceneParams.PI/4;
-	//beta = gSceneParams.PI/4;
-	//sph_Radius = 15.0f;
-	alpha = 0;
-	beta = 0;
-	sph_Radius = 4;
+	alpha = gSceneParams.PI/4;
+	beta = gSceneParams.PI/4;
+	sph_Radius = 15.0f;
 	UpdateEye();
 
 	CalculatePV();

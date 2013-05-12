@@ -69,10 +69,9 @@ int InitGL(int winWidth, int winHeight, int glver_major, int glver_minor){
 }
 
 int InitScene(){
-	glfwSetWindowTitle("Ambient occlusion demo");
+	glfwSetWindowTitle("SSAO demo");
 	glfwSetMouseWheelCallback( MouseWheelHandler );
 
-	gSceneParams.VerBuffer[0];
 	gSceneParams.ratio = gSceneParams.winWidth/(float)gSceneParams.winHeight;
 	gSceneParams.cam = Camera();
 	// Создаём VertexArray.
@@ -103,13 +102,27 @@ int InitScene(){
 	glGenTextures(1, &gSceneParams.NormalTexture);
 	glBindTexture(GL_TEXTURE_2D, gSceneParams.NormalTexture);
 	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, gSceneParams.winWidth, gSceneParams.winHeight, 0, GL_RGB, GL_FLOAT, 0);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, gSceneParams.winWidth, gSceneParams.winHeight, 0, GL_RGB, GL_BYTE, 0);
-	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, gSceneParams.winWidth, gSceneParams.winHeight, 0, GL_RGB, GL_SHORT, 0);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, gSceneParams.winWidth, gSceneParams.winHeight, 0, GL_RGB, GL_BYTE, 0);
+	//glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, gSceneParams.winWidth, gSceneParams.winHeight, 0, GL_RED, GL_FLOAT, 0);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, gSceneParams.NormalTexture, 0);
 
+	glGenTextures(1, &gSceneParams.AmbientOcclusionTexture);
+	glBindTexture(GL_TEXTURE_2D, gSceneParams.AmbientOcclusionTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, gSceneParams.winWidth, gSceneParams.winHeight, 0, GL_RGB, GL_BYTE, 0);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	//glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, gSceneParams.AmbientOcclusionTexture, 0);
+
+	//GLenum drawBuffes[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+	//glDrawBuffers(3, drawBuffes);
 	GLenum drawBuffes[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
 	glDrawBuffers(2, drawBuffes);
 
@@ -177,6 +190,13 @@ int InitScene(){
 	gSceneParams.SSAO_Shader_P_Ref = glGetUniformLocation(gSceneParams.SSAO_Shader, "P");
 	gSceneParams.SSAO_Shader_winRatio_Ref = glGetUniformLocation(gSceneParams.SSAO_Shader, "winRatio");
 
+	gSceneParams.SSAO_Blur_Shader = CreateProgram("shaders/ssao_blur.vs", "shaders/ssao_blur.fs");
+	if( gSceneParams.SSAO_Blur_Shader == 0 ){
+		cerr <<  "Failed to create shader." << endl;
+		return -1;
+	}
+	gSceneParams.SSAO_Blur_Shader_AmbOcclusionMap_Ref = glGetUniformLocation(gSceneParams.SSAO_Blur_Shader, "AmbOcclusionMap");
+
 	// Генерация случайных векторов длины 1
 	// для определения occlusion factor'а.
 	GLuint testImgSize = 16;
@@ -218,6 +238,7 @@ int InitScene(){
 	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
+
 	testImgSize = 4;
 	GLubyte RandVectors[testImgSize][testImgSize][3];
 	srand(time(0));
@@ -247,6 +268,7 @@ int InitScene(){
 
 	AddGridToScene(1.0f, 10);
 	AmbientOcclusion();
+
 	return 1;
 }
 
@@ -286,13 +308,16 @@ void RenderScene(){
 	glUseProgram( 0 );
 	*/
 
-	// Рендерим текстуры глубины и нормалей.
-	glClearColor(1,0,0,1);
 	glBindFramebuffer(GL_FRAMEBUFFER, gSceneParams.DepthNormalFrameBuffer);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, gSceneParams.LinearDepthTexture, 0);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, gSceneParams.NormalTexture, 0);
+	GLenum drawBuffes[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+	glDrawBuffers(2, drawBuffes);
+	// Рендерим текстуры глубины и нормалей.
+	//glClearColor(1,0,0,1);
+	//glBindFramebuffer(GL_FRAMEBUFFER, gSceneParams.DepthNormalFrameBuffer);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glUseProgram( gSceneParams.DepNorShader );
-	glEnableVertexAttribArray(0);
-	glEnableVertexAttribArray(1);
 	glBindBuffer(GL_ARRAY_BUFFER, gSceneParams.testBuffer);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gSceneParams.testIndBuffer);
 	Mat4x4 P, V, W;
@@ -302,6 +327,8 @@ void RenderScene(){
 	glUniformMatrix4fv( gSceneParams.DepNorShader_P_Ref, 1, GL_TRUE, P.m );
 	glUniformMatrix4fv( gSceneParams.DepNorShader_V_Ref, 1, GL_TRUE, V.m );
 	glUniformMatrix4fv( gSceneParams.DepNorShader_W_Ref, 1, GL_TRUE, W.m );
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex_Pos_Col), (void*)0);
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex_Pos_Col), (void*)(sizeof(GLfloat)*3));
 	glDrawElements(GL_TRIANGLES, gSceneParams.testIndCount, GL_UNSIGNED_SHORT, 0);
@@ -309,25 +336,21 @@ void RenderScene(){
 	glDisableVertexAttribArray(1);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glUseProgram(0);
 
+	// Рендерим ambient occlusion текстуру.
 	//glClearColor(0.1, 0.0, 0.35, 1.0f);
 	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	//glUseProgram(quadShader);
-	//glActiveTexture(GL_TEXTURE0);
-	//glBindTexture(GL_TEXTURE_2D, gSceneParams.SamplesTexture);
-	//glBindTexture(GL_TEXTURE_2D, gSceneParams.LinearDepthTexture);
-	//glBindTexture(GL_TEXTURE_2D, gSceneParams.NormalTexture);
-	//glUniform1i(renderedTextureID, 0);
-	//glBindBuffer(GL_ARRAY_BUFFER, quadVerBuffer);
-	//glEnableVertexAttribArray(0);
-	//glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
-	//glDrawArrays(GL_TRIANGLES, 0, 6);
-	//glDisableVertexAttribArray(0);
+	//glDisable(GL_DEPTH_TEST);
 
-	glClearColor(0.1, 0.0, 0.35, 1.0f);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, gSceneParams.AmbientOcclusionTexture, 0);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, 0, 0);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, 0, 0);
+	GLenum drawBuffes2[1] = { GL_COLOR_ATTACHMENT0 };
+	glDrawBuffers(1, drawBuffes2);
+
 	glUseProgram(gSceneParams.SSAO_Shader);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, gSceneParams.LinearDepthTexture);
@@ -348,6 +371,41 @@ void RenderScene(){
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 	glDisableVertexAttribArray(0);
+	glUseProgram(0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	// Размывание ambient occlusion текстуры.
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glUseProgram(gSceneParams.SSAO_Blur_Shader);
+	glActiveTexture(GL_TEXTURE0);
+	//glBindTexture(GL_TEXTURE_2D, gSceneParams.LinearDepthTexture);
+	//glBindTexture(GL_TEXTURE_2D, gSceneParams.NormalTexture);
+	glBindTexture(GL_TEXTURE_2D, gSceneParams.AmbientOcclusionTexture);
+	glUniform1i(gSceneParams.SSAO_Blur_Shader_AmbOcclusionMap_Ref, 0);
+	glBindBuffer(GL_ARRAY_BUFFER, quadVerBuffer);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+	glDisableVertexAttribArray(0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glUseProgram(0);
+
+	//glClearColor(0.1, 0.0, 0.35, 1.0f);
+	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	//glUseProgram(quadShader);
+	//glActiveTexture(GL_TEXTURE0);
+	////glBindTexture(GL_TEXTURE_2D, gSceneParams.LinearDepthTexture);
+	//glBindTexture(GL_TEXTURE_2D, gSceneParams.AmbientOcclusionTexture);
+	//glUniform1i(renderedTextureID, 0);
+	//glBindBuffer(GL_ARRAY_BUFFER, quadVerBuffer);
+	//glEnableVertexAttribArray(0);
+	//glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+	//glDrawArrays(GL_TRIANGLES, 0, 6);
+	//glDisableVertexAttribArray(0);
+	//glUseProgram(0);
+	//glBindTexture(GL_TEXTURE_2D, 0);
 
 	//bool static Readed = false;
 	//if( !Readed ){
@@ -388,7 +446,7 @@ static void AmbientOcclusion(){
 	// Загружаем объект.
 	vector<Vertex_Pos_Col> vers;
 	vector<GLushort> inds;
-	FILE* f = fopen("rand.obj", "r");
+	FILE* f = fopen("objects/many3.obj", "r");
 	if( f == NULL ){
 		cerr << "Could not open file." << endl;
 		return;
@@ -409,7 +467,6 @@ static void AmbientOcclusion(){
 			inds.push_back(index[2]-1);
 		}
 	}
-	//cout << inds.size() << endl;
 	fclose(f);
 
 	GLuint triCount = inds.size()/3;
