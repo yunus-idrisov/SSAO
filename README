@@ -6,4 +6,6 @@ ambient occlusion) для имитации глобального освещен
 Программа основана на статье:
 http://john-chapman-graphics.blogspot.co.uk/2013/01/ssao-tutorial.html
 
+Модель взята с сайта www.archive3d.net
+
 Для компиляции необходима библиотека GLFW.
