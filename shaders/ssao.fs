@@ -1,61 +1,47 @@
 #version 330
 
-layout(location = 0) out float amb;
+layout(location = 0) out float occFactor;
 in vec2 uv;
 
 uniform sampler2D LinDepthMap;
-uniform sampler2D NormalMap;
-uniform sampler2D SamplesMap;	  // Samples for occlusion test
-uniform sampler2D RandVectorsMap; // Map of random vectors for samples rotation(4x4)
+uniform sampler2D SamplesMap;	  // Вектора для определения occlusion factor.
+uniform sampler2D RandVectorsMap; // Вектора для поворота.
 
 uniform mat4 P;
-uniform float winRatio;// winWidth/winHeight
+uniform vec4 winParams;// winRatio, near, far, winWidth
+const int SamplesMapSize = 4;
 
 void main(){
-	float uRadius = 2.0f;
-	int w = 4;
-	vec3 viewRay = vec3( -(uv.x*2.0f - 1.0f)*winRatio, uv.y*2.0f - 1.0f, P[1][1] );
+	// Получения положения точки в View Space.
+	vec3 viewRay = vec3( -(uv.x*2.0f - 1.0f)*winParams[0], uv.y*2.0f - 1.0f, P[1][1] );
 	viewRay = normalize(viewRay);
-	float d = mix(0.1f, 100.0f, texture(LinDepthMap, uv).r);
+	float d = mix(winParams[1], winParams[2], texture(LinDepthMap, uv).r);
 	float t = d/viewRay.z;
 	vec3 orig = vec3( viewRay.x*t, viewRay.y*t, d );
 
-	vec3 n = texture(NormalMap, uv).xyz*2.0f - 1.0f;
-	n = normalize(n);
-	/*vec3 z = texture(NormalMap, uv).xyz*2.0f - 1.0f;*/
-	/*z = normalize(z);*/
-	/*vec3 x = texture(RandVectorsMap, uv*vec2(800/4, 600/4)).xyz*2.0f - 1.0f;*/
-	/*x = normalize(x - dot(x,z)*z);*/
-	/*vec3 y = cross(x,z);*/
-	/*mat3 RotMatrix = mat3(x,y,z);*/
-
-	vec3 z = texture(RandVectorsMap, uv*vec2(800/4, 600/4)).xyz*2.0f - 1.0f;
-	vec3 x = normalize(vec3(1,-z.x/z.y - 1*z.z/z.y, 1));
+	// Строим матрицу для поворота тестируемых векторов.
+	vec3 z = texture(RandVectorsMap, uv*vec2(winParams[3]/4, winParams[3]/winParams[0]/4)).xyz*2.0f - 1.0f;
+	z = normalize(z);
+	vec3 x = normalize(vec3(1,-z.x/z.y - 2*z.z/z.y, 2));
 	vec3 y = cross(x,z);
 	mat3 RotMatrix = mat3(x,y,z);
 
-	float inc = 1.0f/w;
-	int SuccedPoint = 0;
-	for(float i = 1.0f/(w*2); i < 1.0; i += inc){
-		for(float j = 1.0f/(w*2); j < 1.0; j += inc){
-			vec3 rvec = texture(SamplesMap, vec2(i,j)).xyz*2.0f - 1.0f;
-			rvec = RotMatrix*rvec;
-			/*rvec = orig + rvec*uRadius;*/
-			rvec = orig + rvec;
-			vec4 projPoint = P*vec4(rvec,1.0f);
-			projPoint.xy /= projPoint.w;
-			if( projPoint.x > 1.0f || projPoint.x < -1.0f )
+	float inc = 1.0f/SamplesMapSize;
+	int SuccedSamples = 0;
+	for(float i = 1.0f/(SamplesMapSize*2); i < 1.0; i += inc){
+		for(float j = 1.0f/(SamplesMapSize*2); j < 1.0; j += inc){
+			vec3 sample = texture(SamplesMap, vec2(i,j)).xyz*2.0f - 1.0f;
+			sample = RotMatrix*sample;
+			sample = orig + sample;
+			vec4 sampleProj = P*vec4(sample,1.0f);
+			sampleProj.xy /= sampleProj.w;
+			if( abs(sampleProj.x) > 1 || abs(sampleProj.y) > 1 )
 				continue;
-			if( projPoint.y > 1.0f || projPoint.y < -1.0f )
-				continue;
-			projPoint.xy = projPoint.xy*0.5f + 0.5f;
-			float projPointDepth = mix(0.1f, 100.0f, texture(LinDepthMap, projPoint.xy).r);
-			/*int rangeCheck = abs(orig.z - projPointDepth) < uRadius ? 1 : 0;*/
-			/*SuccedPoint += ((rvec.z >= projPointDepth) ? 1 : 0) * rangeCheck;*/
-			if( rvec.z >= projPointDepth )
-				SuccedPoint++;
+			sampleProj.xy = sampleProj.xy*0.5f + 0.5f;
+			float sampleProjDepth = mix(winParams[1], winParams[2], texture(LinDepthMap, sampleProj.xy).r);
+			if( sample.z >= sampleProjDepth )
+				SuccedSamples++;
 		}
 	}
-	float occ = 1.0f - float(SuccedPoint)/float(w*w);
-	amb = occ;
+	occFactor = 1.0f - SuccedSamples/float(SamplesMapSize*SamplesMapSize);
 }

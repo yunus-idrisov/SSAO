@@ -12,26 +12,12 @@ using namespace std;
 const GLfloat SceneParameters::PI;
 const GLfloat SceneParameters::PI_OVER_TWO;
 
-SceneParameters gSceneParams;
+SceneParameters gScene;
 
-static Vector3f NormalFrom3Points(const Vector3f& v1,const Vector3f& v2,const Vector3f& v3);
-static void AddGridToScene(GLfloat gridCellSize, GLint CellCount);
 static GLfloat GetRand();// [-1,1]
 
 static void InputHandler(GLfloat deltaTime);
 static void MouseWheelHandler(GLint pos);
-
-static void AmbientOcclusion();
-
-static GLuint testTexture;
-
-static GLuint quadVerBuffer;
-static GLuint quadShader;
-static GLuint renderedTextureID;
-
-// For delete.
-static GLuint PointObj;
-static GLuint pointCount;
 
 int InitGL(int winWidth, int winHeight, int glver_major, int glver_minor){
 	if( !glfwInit() ){
@@ -63,12 +49,11 @@ int InitGL(int winWidth, int winHeight, int glver_major, int glver_minor){
 	glDepthFunc(GL_LESS);
 	glDepthRange(0.0f, 1.0f);
 
-	//glClearColor(0.1, 0.0, 0.35, 1.0f);
 	glClearColor(1,0,0,1);
 	glClearDepth(1.0f);
 
-	gSceneParams.winWidth = winWidth;
-	gSceneParams.winHeight = winHeight;
+	gScene.winWidth = winWidth;
+	gScene.winHeight = winHeight;
 	return 1;
 }
 
@@ -76,177 +61,129 @@ int InitScene(){
 	glfwSetWindowTitle("SSAO demo");
 	glfwSetMouseWheelCallback( MouseWheelHandler );
 
-	gSceneParams.ratio = gSceneParams.winWidth/(float)gSceneParams.winHeight;
-	gSceneParams.cam = Camera();
+	gScene.ratio = gScene.winWidth/(float)gScene.winHeight;
+	gScene.texelSize.x = 1.0/gScene.winWidth;
+	gScene.texelSize.y = 1.0/gScene.winHeight;
+	gScene.cam = Camera();
 	// Создаём VertexArray.
-	glGenVertexArrays(1, &gSceneParams.vertexArrayID);
-	glBindVertexArray(gSceneParams.vertexArrayID);
+	glGenVertexArrays(1, &gScene.vertexArrayID);
+	glBindVertexArray(gScene.vertexArrayID);
 
 	// Создаём framebuffer.
-	glGenFramebuffers(1, &gSceneParams.DepthNormalFrameBuffer);
-	glBindFramebuffer(GL_FRAMEBUFFER, gSceneParams.DepthNormalFrameBuffer);
+	glGenFramebuffers(1, &gScene.DepthFrameBuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, gScene.DepthFrameBuffer);
 
 	// Создаём буфер глубины для framebuffer'a.
-	glGenRenderbuffers(1, &gSceneParams.DepthRenderBuffer);
-	glBindRenderbuffer(GL_RENDERBUFFER, gSceneParams.DepthRenderBuffer);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, gSceneParams.winWidth, gSceneParams.winHeight);
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, gSceneParams.DepthRenderBuffer);
+	glGenRenderbuffers(1, &gScene.DepthRenderBuffer);
+	glBindRenderbuffer(GL_RENDERBUFFER, gScene.DepthRenderBuffer);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, gScene.winWidth, gScene.winHeight);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, gScene.DepthRenderBuffer);
 	glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
-	// Создаём текстуры для рендеринга линейной глубины и нормалей.
-	glGenTextures(1, &gSceneParams.LinearDepthTexture);
-	glBindTexture(GL_TEXTURE_2D, gSceneParams.LinearDepthTexture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_R16, gSceneParams.winWidth, gSceneParams.winHeight, 0, GL_RED, GL_UNSIGNED_SHORT, 0);
+	// Создаём текстуру для рендеринга линейной глубины.
+	glGenTextures(1, &gScene.LinearDepthTexture);
+	glBindTexture(GL_TEXTURE_2D, gScene.LinearDepthTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_R16, gScene.winWidth, gScene.winHeight, 0, GL_RED, GL_UNSIGNED_SHORT, 0);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	glGenTextures(1, &gSceneParams.NormalTexture);
-	glBindTexture(GL_TEXTURE_2D, gSceneParams.NormalTexture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, gSceneParams.winWidth, gSceneParams.winHeight, 0, GL_RGB, GL_BYTE, 0);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	// Ambient occlusion текстура.
-	glGenTextures(1, &gSceneParams.AmbientOcclusionTexture);
-	glBindTexture(GL_TEXTURE_2D, gSceneParams.AmbientOcclusionTexture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, gSceneParams.winWidth, gSceneParams.winHeight, 0, GL_RED, GL_BYTE, 0);
+	glGenTextures(1, &gScene.AmbientOcclusionTexture);
+	glBindTexture(GL_TEXTURE_2D, gScene.AmbientOcclusionTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, gScene.winWidth, gScene.winHeight, 0, GL_RED, GL_UNSIGNED_BYTE, 0);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
+	GLenum drawBuffes[1] = { GL_COLOR_ATTACHMENT0 };
+	glDrawBuffers(1, drawBuffes);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	// Объект для теста буфера глубины и нормалей
+	// Создаем четырехугольник для рендеринга текстуры.
 	GLfloat quad_vers_pos[] = {
 		-1, -1,
 		 1, -1,
+		 1,  1,
 		-1,  1,
-		-1,  1,
-		 1, -1,
-		 1,  1
 	};
 
-	glGenBuffers(1, &quadVerBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, quadVerBuffer);
+	glGenBuffers(1, &gScene.VerBuffer[0]);
+	glBindBuffer(GL_ARRAY_BUFFER, gScene.VerBuffer[0]);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(quad_vers_pos), quad_vers_pos, GL_STATIC_DRAW);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	quadShader = CreateProgram("shaders/quadVerShader.vs", "shaders/quadFragShader.fs");
-	if( quadShader == 0 ){
-		cerr <<  "Failed to create shader." << endl;
-		return -1;
-	}
-	renderedTextureID = glGetUniformLocation(quadShader, "renderedTexture");
+	gScene.VerCount[0] = 4;
+
+	GLuint indices[6] = { 0,1,2,
+						  0,2,3 };
+	glGenBuffers(1, &gScene.IndBuffer[0]);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gScene.IndBuffer[0]);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	gScene.IndCount[0] = 6;
 
 	// Создаём шейдеры.
-	gSceneParams.gridShader = CreateProgram("shaders/grid.vs", "shaders/grid.fs");
-	if( gSceneParams.gridShader == 0 ){
+	gScene.DepGenShader = CreateProgram("shaders/depth_gen.vs", "shaders/depth_gen.fs");
+	if( gScene.DepGenShader == 0 ){
 		cerr <<  "Failed to create shader." << endl;
 		return -1;
 	}
-	gSceneParams.gridShaderPVW_Ref = glGetUniformLocation(gSceneParams.gridShader, "mPVW");
+	gScene.DepGenShader_P_Ref = glGetUniformLocation(gScene.DepGenShader, "P");
+	gScene.DepGenShader_V_Ref = glGetUniformLocation(gScene.DepGenShader, "V");
+	gScene.DepGenShader_W_Ref = glGetUniformLocation(gScene.DepGenShader, "W");
+	gScene.DepGenShader_near_Ref = glGetUniformLocation(gScene.DepGenShader, "near");
+	gScene.DepGenShader_far_Ref = glGetUniformLocation(gScene.DepGenShader, "far");
 
-	gSceneParams.DepNorShader = CreateProgram("shaders/depth_normal_gen.vs", "shaders/depth_normal_gen.fs");
-	if( gSceneParams.DepNorShader == 0 ){
+	gScene.SSAO_Shader = CreateProgram("shaders/ssao.vs", "shaders/ssao.fs");
+	if( gScene.SSAO_Shader == 0 ){
 		cerr <<  "Failed to create shader." << endl;
 		return -1;
 	}
-	gSceneParams.DepNorShader_P_Ref = glGetUniformLocation(gSceneParams.DepNorShader, "P");
-	gSceneParams.DepNorShader_V_Ref = glGetUniformLocation(gSceneParams.DepNorShader, "V");
-	gSceneParams.DepNorShader_W_Ref = glGetUniformLocation(gSceneParams.DepNorShader, "W");
+	gScene.SSAO_Shader_LinDepthMap_Ref = glGetUniformLocation(gScene.SSAO_Shader, "LinDepthMap");
+	gScene.SSAO_Shader_SamplesMap_Ref = glGetUniformLocation(gScene.SSAO_Shader, "SamplesMap");
+	gScene.SSAO_Shader_RandVectorsMap_Ref = glGetUniformLocation(gScene.SSAO_Shader, "RandVectorsMap");
+	gScene.SSAO_Shader_P_Ref = glGetUniformLocation(gScene.SSAO_Shader, "P");
+	gScene.SSAO_Shader_winParams_Ref = glGetUniformLocation(gScene.SSAO_Shader, "winParams");
 
-	gSceneParams.SSAO_Shader = CreateProgram("shaders/ssao.vs", "shaders/ssao.fs");
-	if( gSceneParams.SSAO_Shader == 0 ){
+	gScene.SSAO_Blur_Shader = CreateProgram("shaders/ssao_blur.vs", "shaders/ssao_blur.fs");
+	if( gScene.SSAO_Blur_Shader == 0 ){
 		cerr <<  "Failed to create shader." << endl;
 		return -1;
 	}
-	gSceneParams.SSAO_Shader_LinDepthMap_Ref = glGetUniformLocation(gSceneParams.SSAO_Shader, "LinDepthMap");
-	gSceneParams.SSAO_Shader_NormalMap_Ref = glGetUniformLocation(gSceneParams.SSAO_Shader, "NormalMap");
-	gSceneParams.SSAO_Shader_SamplesMap_Ref = glGetUniformLocation(gSceneParams.SSAO_Shader, "SamplesMap");
-	gSceneParams.SSAO_Shader_RandVectorsMap_Ref = glGetUniformLocation(gSceneParams.SSAO_Shader, "RandVectorsMap");
-	gSceneParams.SSAO_Shader_P_Ref = glGetUniformLocation(gSceneParams.SSAO_Shader, "P");
-	gSceneParams.SSAO_Shader_winRatio_Ref = glGetUniformLocation(gSceneParams.SSAO_Shader, "winRatio");
+	gScene.SSAO_Blur_Shader_AmbOcclusionMap_Ref = glGetUniformLocation(gScene.SSAO_Blur_Shader, "AmbOcclusionMap");
+	gScene.SSAO_Blur_Shader_texelSize_Ref = glGetUniformLocation(gScene.SSAO_Blur_Shader, "texelSize");
 
-	gSceneParams.SSAO_Blur_Shader = CreateProgram("shaders/ssao_blur.vs", "shaders/ssao_blur.fs");
-	if( gSceneParams.SSAO_Blur_Shader == 0 ){
-		cerr <<  "Failed to create shader." << endl;
-		return -1;
-	}
-	gSceneParams.SSAO_Blur_Shader_AmbOcclusionMap_Ref = glGetUniformLocation(gSceneParams.SSAO_Blur_Shader, "AmbOcclusionMap");
+	// Вектора для определения occlusion factor'а.
+	const GLuint SamplesImgSize = 4;
+	GLubyte SamplesImg[SamplesImgSize][SamplesImgSize][3] = {
+		{ {121, 127, 127}, {135, 135, 129}, {122, 127, 128}, {126, 128, 126} },
+		{ {127, 126, 127}, {126, 144, 141}, {134, 129, 127}, {123, 144, 121} },
+		{ {126, 138, 143}, {166, 136, 102}, {108, 144, 119}, {135, 135, 131} },
+		{ {141, 112, 115}, { 74,  75,  97}, {129, 129, 124}, {149, 127, 135} } };
 
-	// Генерация случайных векторов длины 1
-	// для определения occlusion factor'а.
-	GLuint testImgSize = 16;
-	GLubyte testImgPixels[testImgSize][testImgSize][3];
-	srand(time(0));
-	int k = 0;
-	Vertex_Pos_Col vers[testImgSize*testImgSize];
-	for(int i = 0; i < testImgSize; i++){
-		for(int j = 0; j < testImgSize; j++){
-			Vector3f rv;
-			rv.x = GetRand();
-			rv.y = GetRand();
-			rv.z = GetRand();
-			//rv.z = (GetRand() + 1.0f)/2.0f;
-			Vec3Normalize(rv);
-			float r = 0.5f*GetRand() + 0.5f;
-			//float r = 0.45f*GetRand() + 0.55f;
-			rv.x *= r;
-			rv.y *= r;
-			rv.z *= r;
-			float scale = float(k)/(testImgSize*testImgSize);
-			scale = 0.1f + (1.0f - 0.1f)*scale*scale;
-			rv.x *= scale;
-			rv.y *= scale;
-			rv.z *= scale;
-			vers[k].pos = rv;
-			Vector3f white = {1,1,1};
-			vers[k].col = white;
-			testImgPixels[i][j][0] = (rv.x + 1.0f)/2.0f*255;
-			testImgPixels[i][j][1] = (rv.y + 1.0f)/2.0f*255;
-			testImgPixels[i][j][2] = (rv.z + 1.0f)/2.0f*255;
-			k++;
-		}
-	}
-	pointCount = testImgSize*testImgSize;
-	glGenBuffers(1, &PointObj);
-	glBindBuffer(GL_ARRAY_BUFFER, PointObj);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex_Pos_Col)*pointCount, vers, GL_STATIC_DRAW);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-	glGenTextures(1, &gSceneParams.SamplesTexture);
-	glBindTexture(GL_TEXTURE_2D, gSceneParams.SamplesTexture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, testImgSize, testImgSize, 0, GL_RGB, GL_UNSIGNED_BYTE, testImgPixels);
+	glGenTextures(1, &gScene.SamplesTexture);
+	glBindTexture(GL_TEXTURE_2D, gScene.SamplesTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SamplesImgSize, SamplesImgSize, 0, GL_RGB, GL_UNSIGNED_BYTE, SamplesImg);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	testImgSize = 4;
-	GLubyte RandVectors[testImgSize][testImgSize][3];
-	srand(time(0));
-	for(int i = 0; i < testImgSize; i++){
-		for(int j = 0; j < testImgSize; j++){
-			Vector3f rv;
-			rv.x = GetRand();
-			rv.y = GetRand();
-			rv.z = GetRand();
-			Vec3Normalize(rv);
-			RandVectors[i][j][0] = (rv.x + 1.0f)/2.0f*255;
-			RandVectors[i][j][1] = (rv.y + 1.0f)/2.0f*255;
-			RandVectors[i][j][2] = (rv.z + 1.0f)/2.0f*255;
-		}
-	}
+	// Вектора используемые для поворота.
+	GLubyte RandVectors[4][4][3] = {
+		{ {  0, 124, 121}, {115, 218, 216}, {151, 215,  38}, {143, 186,  15} },
+		{ { 82, 230,  66}, { 27, 134,  49}, {144,   1, 117}, {204, 190, 207} },
+		{ {250, 161, 129}, { 68, 100, 237}, {  6, 160, 104}, {199, 232, 118} },
+		{ {232, 152,  59}, {209,  55, 193}, { 33, 110, 212}, {183, 152,  15} } };
 
-	glGenTextures(1, &gSceneParams.RandVectorsTexture);
-	glBindTexture(GL_TEXTURE_2D, gSceneParams.RandVectorsTexture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, testImgSize, testImgSize, 0, GL_RGB, GL_UNSIGNED_BYTE, RandVectors);
+	glGenTextures(1, &gScene.RandVectorsTexture);
+	glBindTexture(GL_TEXTURE_2D, gScene.RandVectorsTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 4, 4, 0, GL_RGB, GL_UNSIGNED_BYTE, RandVectors);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	AddGridToScene(1.0f, 10);
-	AmbientOcclusion();
+	// Загружаем объект.
+	LoadModel("models/house.obj");
 	return 1;
 }
 
@@ -257,11 +194,12 @@ void UpdateScene(){
 	InputHandler(deltaTime);
 
 	lastTime = glfwGetTime();
+
 	// Вычисление FPS.
 	static double startTime = glfwGetTime();
 	static int FPS = 0;
 	if( glfwGetTime() - startTime > 1.0f ){
-		cout << FPS << endl;
+		//cout << FPS << endl;
 		startTime = glfwGetTime();
 		FPS = 0;
 	}
@@ -269,105 +207,73 @@ void UpdateScene(){
 }
 
 void RenderScene(){
-	//glClearColor(0.1f, 0.0f, 0.1f, 1.0f);
-	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	//glUseProgram( gSceneParams.gridShader );
-	//glEnableVertexAttribArray(0);
-	//glEnableVertexAttribArray(1);
-	//glBindBuffer(GL_ARRAY_BUFFER, PointObj);
-	//glUniformMatrix4fv( gSceneParams.gridShaderPVW_Ref, 1, GL_TRUE, gSceneParams.cam.GetPV().m );
-	//glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex_Pos_Col), (void*)0);
-	//glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex_Pos_Col), (void*)(sizeof(GLfloat)*3));
-	//glDrawArrays(GL_POINTS, 0, pointCount);
-
-	// Рендерим текстуры глубины и нормалей.
-	glClearColor(1,0,0,1);
-	glBindFramebuffer(GL_FRAMEBUFFER, gSceneParams.DepthNormalFrameBuffer);
-	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, gSceneParams.LinearDepthTexture, 0);
-	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, gSceneParams.NormalTexture, 0);
-	GLenum drawBuffes[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-	glDrawBuffers(2, drawBuffes);
+	// Рендерим текстуру глубины.
+	glEnable(GL_DEPTH_TEST);
+	glBindFramebuffer(GL_FRAMEBUFFER, gScene.DepthFrameBuffer);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, gScene.LinearDepthTexture, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glUseProgram( gSceneParams.DepNorShader );
-	glBindBuffer(GL_ARRAY_BUFFER, gSceneParams.testBuffer);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gSceneParams.testIndBuffer);
+	glUseProgram( gScene.DepGenShader );
+	glBindBuffer(GL_ARRAY_BUFFER, gScene.VerBuffer[1]);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gScene.IndBuffer[1]);
 	Mat4x4 P, V, W;
-	Mat4x4Pers(P, gSceneParams.cam.GetFov(), gSceneParams.cam.GetRatio(), gSceneParams.cam.GetNear(), gSceneParams.cam.GetFar());
-	Mat4x4View(V, gSceneParams.cam.GetEye(), gSceneParams.cam.GetTarget(), gSceneParams.cam.GetUp());
+	Mat4x4Pers(P, gScene.cam.GetFov(), gScene.cam.GetRatio(), gScene.cam.GetNear(), gScene.cam.GetFar());
+	Mat4x4View(V, gScene.cam.GetEye(), gScene.cam.GetTarget(), gScene.cam.GetUp());
 	Mat4x4Identity(W);
-	glUniformMatrix4fv( gSceneParams.DepNorShader_P_Ref, 1, GL_TRUE, P.m );
-	glUniformMatrix4fv( gSceneParams.DepNorShader_V_Ref, 1, GL_TRUE, V.m );
-	glUniformMatrix4fv( gSceneParams.DepNorShader_W_Ref, 1, GL_TRUE, W.m );
+	glUniformMatrix4fv( gScene.DepGenShader_P_Ref, 1, GL_TRUE, P.m );
+	glUniformMatrix4fv( gScene.DepGenShader_V_Ref, 1, GL_TRUE, V.m );
+	glUniformMatrix4fv( gScene.DepGenShader_W_Ref, 1, GL_TRUE, W.m );
+	glUniform1f( gScene.DepGenShader_near_Ref, gScene.cam.GetNear() );
+	glUniform1f( gScene.DepGenShader_far_Ref, gScene.cam.GetFar() );
 	glEnableVertexAttribArray(0);
-	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex_Pos_Col), (void*)0);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex_Pos_Col), (void*)(sizeof(GLfloat)*3));
-	glDrawElements(GL_TRIANGLES, gSceneParams.testIndCount, GL_UNSIGNED_INT, 0);
-	glDisableVertexAttribArray(0);
-	glDisableVertexAttribArray(1);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glUseProgram(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex_Pos), (void*)0);
+	glDrawElements(GL_TRIANGLES, gScene.IndCount[1], GL_UNSIGNED_INT, 0);
 
 	// Рендерим ambient occlusion текстуру.
-	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, 0, 0);
-	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, 0, 0);
-	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, gSceneParams.AmbientOcclusionTexture, 0);
-	GLenum drawBuffes2[1] = { GL_COLOR_ATTACHMENT0 };
-	glDrawBuffers(1, drawBuffes2);
-
-	glUseProgram(gSceneParams.SSAO_Shader);
+	glDisable(GL_DEPTH_TEST);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, gScene.AmbientOcclusionTexture, 0);
+	glUseProgram(gScene.SSAO_Shader);
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, gSceneParams.LinearDepthTexture);
-	glUniform1i(gSceneParams.SSAO_Shader_LinDepthMap_Ref, 0);
+	glBindTexture(GL_TEXTURE_2D, gScene.LinearDepthTexture);
+	glUniform1i(gScene.SSAO_Shader_LinDepthMap_Ref, 0);
 	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, gSceneParams.NormalTexture);
-	glUniform1i(gSceneParams.SSAO_Shader_NormalMap_Ref, 1);
+	glBindTexture(GL_TEXTURE_2D, gScene.SamplesTexture);
+	glUniform1i(gScene.SSAO_Shader_SamplesMap_Ref, 1);
 	glActiveTexture(GL_TEXTURE2);
-	glBindTexture(GL_TEXTURE_2D, gSceneParams.SamplesTexture);
-	glUniform1i(gSceneParams.SSAO_Shader_SamplesMap_Ref, 2);
-	glActiveTexture(GL_TEXTURE3);
-	glBindTexture(GL_TEXTURE_2D, gSceneParams.RandVectorsTexture);
-	glUniform1i(gSceneParams.SSAO_Shader_RandVectorsMap_Ref, 3);
-	glUniformMatrix4fv( gSceneParams.SSAO_Shader_P_Ref, 1, GL_TRUE, P.m );
-	glUniform1f( gSceneParams.SSAO_Shader_winRatio_Ref, gSceneParams.cam.GetRatio() );
-	glBindBuffer(GL_ARRAY_BUFFER, quadVerBuffer);
+	glBindTexture(GL_TEXTURE_2D, gScene.RandVectorsTexture);
+	glUniform1i(gScene.SSAO_Shader_RandVectorsMap_Ref, 2);
+	glUniformMatrix4fv( gScene.SSAO_Shader_P_Ref, 1, GL_TRUE, P.m );
+	glUniform4f( gScene.SSAO_Shader_winParams_Ref, gScene.ratio, gScene.cam.GetNear(), gScene.cam.GetFar(), gScene.winWidth );
+	glBindBuffer(GL_ARRAY_BUFFER, gScene.VerBuffer[0]);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gScene.IndBuffer[0]);
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
-	glDrawArrays(GL_TRIANGLES, 0, 6);
-	glDisableVertexAttribArray(0);
-	glUseProgram(0);
-	glBindTexture(GL_TEXTURE_2D, 0);
+	glDrawElements(GL_TRIANGLES, gScene.IndCount[0], GL_UNSIGNED_INT, 0);
 
-	// Размывание ambient occlusion текстуры.
+	// Размывание ambient occlusion текстуры и вывод на экран.
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glUseProgram(gSceneParams.SSAO_Blur_Shader);
+	glUseProgram(gScene.SSAO_Blur_Shader);
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, gSceneParams.AmbientOcclusionTexture);
-	//glBindTexture(GL_TEXTURE_2D, gSceneParams.NormalTexture);
-	glUniform1i(gSceneParams.SSAO_Blur_Shader_AmbOcclusionMap_Ref, 0);
-	glBindBuffer(GL_ARRAY_BUFFER, quadVerBuffer);
+	glBindTexture(GL_TEXTURE_2D, gScene.AmbientOcclusionTexture);
+	glUniform1i(gScene.SSAO_Blur_Shader_AmbOcclusionMap_Ref, 0);
+	glUniform2f(gScene.SSAO_Blur_Shader_texelSize_Ref, gScene.texelSize.x, gScene.texelSize.y);
+	glBindBuffer(GL_ARRAY_BUFFER, gScene.VerBuffer[0]);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gScene.IndBuffer[0]);
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
-	glDrawArrays(GL_TRIANGLES, 0, 6);
-	glDisableVertexAttribArray(0);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glUseProgram(0);
+	glDrawElements(GL_TRIANGLES, gScene.IndCount[0], GL_UNSIGNED_INT, 0);
 }
 
-static void AmbientOcclusion(){
-	// Загружаем объект.
-	vector<Vertex_Pos_Col> vers;
+void LoadModel(const char* path){
+	vector<Vertex_Pos> vers;
 	vector<GLuint> inds;
-	FILE* f = fopen("objects/temple.obj", "r");
+	FILE* f = fopen(path, "r");
 	if( f == NULL ){
-		cerr << "Could not open file." << endl;
+		cerr << "Can not open file: \"" << path << '\"' << endl;
 		return;
 	}
 	char buf[1024];
-	Vertex_Pos_Col ver = {0,0,0,0,0,0};
+	Vertex_Pos ver = {0,0,0};
 	GLuint index[3];
 	while( fgets(buf, 1024,f) != NULL ){
 		if( strncmp(buf, "v ", 2) == 0 ){
@@ -384,41 +290,17 @@ static void AmbientOcclusion(){
 	}
 	fclose(f);
 
-	GLuint triCount = inds.size()/3;
-	Vector3f* norms = new Vector3f[vers.size()];
-	for(int i = 0; i < vers.size(); i++){
-		Vector3f n = {0,0,0};
-		norms[i] = n;
-	}
-
-	// Вычисление нормалей.
-	for(int i = 0; i < triCount; i++){
-		GLushort i1 = inds[3*i + 0];
-		GLushort i2 = inds[3*i + 1];
-		GLushort i3 = inds[3*i + 2];
-		Vector3f n = NormalFrom3Points( vers[i1].pos, vers[i2].pos, vers[i3].pos );
-		Vec3Add(norms[i1], norms[i1], n);
-		Vec3Add(norms[i2], norms[i2], n);
-		Vec3Add(norms[i3], norms[i3], n);
-	}
-
-	for(int i = 0; i < vers.size(); i++){
-		Vec3Normalize( norms[i] );
-		vers[i].col = norms[i];
-	}
-
-	glGenBuffers(1, &gSceneParams.testBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, gSceneParams.testBuffer);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex_Pos_Col)*vers.size(), &vers[0], GL_STATIC_DRAW);
+	glGenBuffers(1, &gScene.VerBuffer[1]);
+	glBindBuffer(GL_ARRAY_BUFFER, gScene.VerBuffer[1]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex_Pos)*vers.size(), &vers[0], GL_STATIC_DRAW);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	gSceneParams.tBufVerCount = vers.size();
+	gScene.VerCount[1] = vers.size();
 
-	glGenBuffers(1, &gSceneParams.testIndBuffer);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gSceneParams.testIndBuffer);
+	glGenBuffers(1, &gScene.IndBuffer[1]);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gScene.IndBuffer[1]);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint)*inds.size(), &inds[0], GL_STATIC_DRAW);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	gSceneParams.testIndCount = inds.size();
-	delete [] norms;
+	gScene.IndCount[1] = inds.size();
 }
 
 GLuint CreateProgram(const char *vertex_shader_path, const char *fragment_shader_path){
@@ -516,107 +398,49 @@ GLuint CreateProgram(const char *vertex_shader_path, const char *fragment_shader
 }
 
 void ReleaseSceneResources(){
-	glDeleteVertexArrays(1, &gSceneParams.vertexArrayID);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glDeleteFramebuffers(1, &gScene.DepthFrameBuffer);
+	glDeleteRenderbuffers(1, &gScene.DepthRenderBuffer);
+	glDeleteTextures(1, &gScene.LinearDepthTexture);
+	glDeleteTextures(1, &gScene.AmbientOcclusionTexture);
+	glDeleteProgram(gScene.DepGenShader);
+	glDeleteProgram(gScene.SSAO_Shader);
+	glDeleteProgram(gScene.SSAO_Blur_Shader);
+	glDeleteVertexArrays(1, &gScene.vertexArrayID);
+	glDeleteBuffers(2, gScene.VerBuffer);
+	glDeleteBuffers(2, gScene.IndBuffer);
 
-	glDeleteBuffers(1, &gSceneParams.VerBuffer[0]);
-	glDeleteProgram(gSceneParams.gridShader);
-}
-
-static void AddGridToScene(GLfloat gridCellSize, GLint CellCount){
-	if( CellCount < 2 )
-		CellCount = 2;
-	if( (CellCount % 2) != 0 )
-		CellCount++;
-	GLint cc = CellCount;
-	GLuint verCount = 2*2*(cc+1);
-
-	Vertex_Pos_Col gridVers[verCount];
-	for(int i = 0; i < verCount; i++){
-		gridVers[i].pos.y = 0.0f;
-
-		gridVers[i].col.x = 0.3f;
-		gridVers[i].col.y = 0.3f;
-		gridVers[i].col.z = 0.3f;
-	}
-
-	GLfloat t = -(cc/2)*gridCellSize;
-	GLuint v = 0;
-	for(int i = 0; i <= cc; i++){
-		gridVers[v].pos.x = t + i*gridCellSize;
-		gridVers[v].pos.z = t;
-		v++;
-		gridVers[v].pos.x = t + i*gridCellSize;
-		gridVers[v].pos.z = -t;
-		v++;
-	}
-
-	for(int i = 0; i <= cc; i++){
-		gridVers[v].pos.x = t; 
-		gridVers[v].pos.z = t + i*gridCellSize;
-		v++;             
-		gridVers[v].pos.x = -t;
-		gridVers[v].pos.z =  t + i*gridCellSize;
-		v++;
-	}
-
-	gridVers[cc].col.x = 0.0f;
-	gridVers[cc].col.y = 0.0f;
-	gridVers[cc].col.z = 1.0f;
-	gridVers[cc+1].col.x = 0.0f;
-	gridVers[cc+1].col.y = 0.0f;
-	gridVers[cc+1].col.z = 1.0f;
-
-	gridVers[cc + verCount/2].col.x = 1.0f;
-	gridVers[cc + verCount/2].col.y = 0.0f;
-	gridVers[cc + verCount/2].col.z = 0.0f;
-	gridVers[cc + verCount/2+1].col.x = 1.0f;
-	gridVers[cc + verCount/2+1].col.y = 0.0f;
-	gridVers[cc + verCount/2+1].col.z = 0.0f;
-
-	glGenBuffers(1, &gSceneParams.VerBuffer[0]);
-	glBindBuffer(GL_ARRAY_BUFFER, gSceneParams.VerBuffer[0]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex_Pos_Col)*verCount, gridVers, GL_STATIC_DRAW);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	gSceneParams.BufferVerCount[0] = verCount;
+	glfwTerminate();
 }
 
 static void InputHandler(GLfloat deltaTime){
 	if( glfwGetKey(GLFW_KEY_LEFT) == GLFW_PRESS )
-		gSceneParams.cam.SetAlpha( gSceneParams.cam.GetAlpha() + 3*deltaTime );
+		gScene.cam.SetAlpha( gScene.cam.GetAlpha() + 3*deltaTime );
 
 	if( glfwGetKey(GLFW_KEY_RIGHT) == GLFW_PRESS )
-		gSceneParams.cam.SetAlpha( gSceneParams.cam.GetAlpha() - 3*deltaTime );
+		gScene.cam.SetAlpha( gScene.cam.GetAlpha() - 3*deltaTime );
 
 	if( glfwGetKey(GLFW_KEY_UP) == GLFW_PRESS )
-		if( (gSceneParams.cam.GetBeta() + 3.0f*deltaTime) < gSceneParams.PI_OVER_TWO )
-			gSceneParams.cam.SetBeta( gSceneParams.cam.GetBeta() + 3*deltaTime );
+		if( (gScene.cam.GetBeta() + 3.0f*deltaTime) < gScene.PI_OVER_TWO )
+			gScene.cam.SetBeta( gScene.cam.GetBeta() + 3*deltaTime );
 
 	if( glfwGetKey(GLFW_KEY_DOWN) == GLFW_PRESS )
-		if( (gSceneParams.cam.GetBeta() - 3.0f*deltaTime) > -gSceneParams.PI_OVER_TWO )
-			gSceneParams.cam.SetBeta( gSceneParams.cam.GetBeta() - 3*deltaTime );
-	gSceneParams.cam.CalculatePV();
+		if( (gScene.cam.GetBeta() - 3.0f*deltaTime) > -gScene.PI_OVER_TWO )
+			gScene.cam.SetBeta( gScene.cam.GetBeta() - 3*deltaTime );
+	gScene.cam.CalculatePV();
 }
 
 static void MouseWheelHandler(GLint pos){
 	static GLint WheelPrevPos = 0;
 	GLint WheelCurrentPos = glfwGetMouseWheel();
 	if( WheelCurrentPos != WheelPrevPos ){
-		gSceneParams.cam.SetRadius( 
-				gSceneParams.cam.GetRadius() + (WheelPrevPos - WheelCurrentPos)
+		gScene.cam.SetRadius( 
+				gScene.cam.GetRadius() + (WheelPrevPos - WheelCurrentPos)
 				);
-		if( gSceneParams.cam.GetRadius() < 1.0f )
-			gSceneParams.cam.SetRadius( 1.0f );
+		if( gScene.cam.GetRadius() < 1.0f )
+			gScene.cam.SetRadius( 1.0f );
 	}
 	WheelPrevPos = WheelCurrentPos;
-}
-
-static Vector3f NormalFrom3Points(const Vector3f& v1,const Vector3f& v2,const Vector3f& v3){
-	Vector3f e1, e2, n;
-	Vec3Sub(e1, v2, v1);
-	Vec3Sub(e2, v3, v1);
-	Vec3CrossProduct(n, e1, e2);
-	Vec3Normalize(n);
-	return n;
 }
 
 static GLfloat GetRand(){

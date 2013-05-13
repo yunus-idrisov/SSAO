@@ -11,52 +11,54 @@ struct SceneParameters{
 	GLuint		winWidth;
 	GLuint		winHeight;
 	GLfloat		ratio;		  // winWidth/winHeight
+	Vector2f	texelSize;
 
 	GLuint		vertexArrayID;
-	GLuint		gridShader;
-	GLuint		gridShaderPVW_Ref;
 
+	// Буферы, используемые в сцене.
+	// 1-й буфер - четырехугольник, в который рендерится текстура.
+	// 2-й буфер - объекты сцены.
 	GLuint		VerBuffer[2];
-	GLuint		BufferVerCount[2];
+	GLuint		VerCount[2];
+	GLuint		IndBuffer[2];
+	GLuint		IndCount[2];
 
-	GLuint		testBuffer;
-	GLuint		tBufVerCount;
-	GLuint		testIndBuffer;
-	GLuint		testIndCount;
-
-	// Framebuffer для генерации текстур линейной
-	// глубины и нормалей сцены.
-	GLuint		DepthNormalFrameBuffer;
+	// Framebuffer для генерации текстуры линейной глубины.
+	GLuint		DepthFrameBuffer;
 	// Renderbuffer глубины, используемый framebuffer'ом.
 	GLuint		DepthRenderBuffer;
-	// Текстуры линейной глубины и нормалей сцены.
+	// Текстура линейной глубины.
 	GLuint		LinearDepthTexture;
-	GLuint		NormalTexture;
 	// Текстура ambient occlusion.
 	GLuint		AmbientOcclusionTexture;
 
-	GLuint		DepNorShader;
-	GLuint		DepNorShader_P_Ref;
-	GLuint		DepNorShader_V_Ref;
-	GLuint		DepNorShader_W_Ref;
+	// Шейдер для извлечения глубины.
+	GLuint		DepGenShader;
+	GLuint		DepGenShader_P_Ref;
+	GLuint		DepGenShader_V_Ref;
+	GLuint		DepGenShader_W_Ref;
+	GLuint		DepGenShader_near_Ref;
+	GLuint		DepGenShader_far_Ref;
 
+	// Шейдер для получения ambient occlusion текстуры.
 	GLuint		SSAO_Shader;
 	GLuint		SSAO_Shader_LinDepthMap_Ref;
-	GLuint		SSAO_Shader_NormalMap_Ref;
 	GLuint		SSAO_Shader_SamplesMap_Ref;
 	GLuint		SSAO_Shader_RandVectorsMap_Ref;
 	GLuint		SSAO_Shader_P_Ref;
-	GLuint		SSAO_Shader_winRatio_Ref;
-
-	GLuint		SSAO_Blur_Shader;
-	GLuint		SSAO_Blur_Shader_AmbOcclusionMap_Ref;
-
+	GLuint		SSAO_Shader_winParams_Ref;
 	GLuint		SamplesTexture;
 	GLuint		RandVectorsTexture;
+
+	// Шейдер для размывания ambient occlusion текстуры.
+	GLuint		SSAO_Blur_Shader;
+	GLuint		SSAO_Blur_Shader_AmbOcclusionMap_Ref;
+	GLuint		SSAO_Blur_Shader_texelSize_Ref;
+
 	Camera		cam;
 };
 
-extern SceneParameters gSceneParams;
+extern SceneParameters gScene;
 
 // Функция для инициализации OpenGL и создания окна.
 // При ошибке возвращается -1.
@@ -77,12 +79,14 @@ void UpdateScene();
 // Функция для рендеринга сцены.
 void RenderScene();
 
+// Загрузка объекта.
+void LoadModel(const char* path);
+
 // Очистка.
 void ReleaseSceneResources();
 
-struct Vertex_Pos_Col{
+struct Vertex_Pos{
 	Vector3f pos;
-	Vector3f col;
 };
 
 #endif // HELPERFUNS_H
