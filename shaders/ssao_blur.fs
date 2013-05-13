@@ -16,4 +16,6 @@ void main(){
 	}
 	aveValue /= 16.0;
 	color = vec3(aveValue, aveValue, aveValue);
+	/*color = texture( AmbOcclusionMap, uv ).xyz;*/
+	/*color = texture( AmbOcclusionMap, uv ).xxx;*/
 }

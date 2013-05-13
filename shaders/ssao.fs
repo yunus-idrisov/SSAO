@@ -1,6 +1,6 @@
 #version 330
 
-layout(location = 0) out vec3 amb;
+layout(location = 0) out float amb;
 in vec2 uv;
 
 uniform sampler2D LinDepthMap;
@@ -11,10 +11,8 @@ uniform sampler2D RandVectorsMap; // Map of random vectors for samples rotation(
 uniform mat4 P;
 uniform float winRatio;// winWidth/winHeight
 
-out vec3 FragColor;
-
 void main(){
-	/*float uRadius = 2.0f;*/
+	float uRadius = 2.0f;
 	int w = 4;
 	vec3 viewRay = vec3( -(uv.x*2.0f - 1.0f)*winRatio, uv.y*2.0f - 1.0f, P[1][1] );
 	viewRay = normalize(viewRay);
@@ -22,10 +20,17 @@ void main(){
 	float t = d/viewRay.z;
 	vec3 orig = vec3( viewRay.x*t, viewRay.y*t, d );
 
-	vec3 z = texture(NormalMap, uv).xyz*2.0f - 1.0f;
-	z = normalize(z);
-	vec3 x = texture(RandVectorsMap, uv * vec2(800/4, 600/4)).xyz*2.0f - 1.0f;
-	x = normalize(x - dot(x,z)*z);
+	vec3 n = texture(NormalMap, uv).xyz*2.0f - 1.0f;
+	n = normalize(n);
+	/*vec3 z = texture(NormalMap, uv).xyz*2.0f - 1.0f;*/
+	/*z = normalize(z);*/
+	/*vec3 x = texture(RandVectorsMap, uv*vec2(800/4, 600/4)).xyz*2.0f - 1.0f;*/
+	/*x = normalize(x - dot(x,z)*z);*/
+	/*vec3 y = cross(x,z);*/
+	/*mat3 RotMatrix = mat3(x,y,z);*/
+
+	vec3 z = texture(RandVectorsMap, uv*vec2(800/4, 600/4)).xyz*2.0f - 1.0f;
+	vec3 x = normalize(vec3(1,-z.x/z.y - 1*z.z/z.y, 1));
 	vec3 y = cross(x,z);
 	mat3 RotMatrix = mat3(x,y,z);
 
@@ -52,11 +57,5 @@ void main(){
 		}
 	}
 	float occ = 1.0f - float(SuccedPoint)/float(w*w);
-	amb = vec3(occ, occ, occ);
-	FragColor = vec3(occ, occ, occ);
-
-	/*vec3 rvec = texture(SamplesMap, vec2(0.125 + 3*0.25,0.125 + 3*0.25)).xyz*2.0f - 1.0f;*/
-	/*PosVS = rvec;*/
-	/*FragColor = texture(RandVectorsMap, uv*vec2(800/4,600/4)).xyz;*/
-	/*FragColor = texture(LinDepthMap, uv).xxx;*/
+	amb = occ;
 }
